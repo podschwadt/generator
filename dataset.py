@@ -8,6 +8,7 @@ def load( ):
     np.random.shuffle( x )
     y = np.arange( x.shape[ 0 ] )
     y = np.ones_like( y )
+    y = y.astype( 'float32' )
 
     x_test = x[  : x.shape[ 0 ] / 10 ]
     x_train = x[ ( x.shape[ 0 ] / 10 ) + 1 :  ]
