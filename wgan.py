@@ -13,6 +13,8 @@ from skimage import io
 import warnings
 import os
 
+from tools import CircleList
+
 
 
 
@@ -24,28 +26,62 @@ import os
 def loss( y_true, y_pred ):
     return K.mean( y_true * y_pred )
 
-RUN = 11
+RUN = 2
 
 #number of samples per iteration
 m = 200
 
 #epochs updating D
-k = 20
+k = 500
 
 #epochs
-epochs = 1000
+epochs = 10000
 
 #batch_size
 batch_size = 25
 
 # optimizers
-optimizer_d = ( Adam( lr=0.00005 ), loss  )
-optimizer_stacked = ( Adam( lr=0.00005 ), loss )
+lr = 0.00005
+optimizer_d = ( Adam( lr=lr ), loss  )
+optimizer_stacked = ( Adam( lr=lr ), loss )
+
+#threshold after we stop learning
+threshold = 0.2
 
 
 #global helpers
 no_out = True
 
+def print_summary():
+    msg = """
+    #################################################################################
+    # {}
+    #################################################################################
+
+    def loss( y_true, y_pred ):
+        return K.mean( y_true * y_pred )
+
+    #number of samples per iteration
+    m = {}
+
+    #epochs updating D
+    k = {}
+
+    #epochs
+    epochs = {}
+
+    #batch_size
+    batch_size = {}
+
+    # optimizers
+    optimizer_d = ( Adam( lr={:.2e} ), loss  )
+    optimizer_stacked = ( Adam( lr={:.2e} ), loss )
+
+    #threshold after we stop learning
+    threshold = {}
+
+    """
+    print( msg.format( RUN, m, k, epochs, batch_size, lr, lr, threshold ) )
 
 #################################################################################
 # Discrimnator
@@ -175,9 +211,10 @@ D = build_discriminator( x_train.shape[ 1 : ] )
 G = build_generator()
 
 
-print('Discrimnator:\n')
+print_summary()
+print('nDiscrimnator:\n')
 D.summary()
-print('Generator:\n')
+print('\nGenerator:\n')
 G.summary()
 
 GD = stack_models( G, D )
@@ -187,8 +224,8 @@ if not os.path.exists( 'out/' ):
     os.makedirs( 'out/' )
 
 if not no_out:
-    if not os.path.exists( 'report/run{}'.format( RUN ) ):
-        os.makedirs( 'report/run{}'.format( RUN )  )
+    if not os.path.exists( 'report/run_wgan_{}'.format( RUN ) ):
+        os.makedirs( 'report/run_wgan_{}'.format( RUN )  )
 
 
 #training epochs
@@ -202,6 +239,11 @@ for epoch in range( epochs ):
     if epoch == 100:
         k = k/2
 
+    l_real = CircleList( 5 )
+    l_fake = CircleList( 5 )
+
+    num_k = 0
+
     for i in range( k ):
         # unfreeze D
         D.trainable = True
@@ -210,21 +252,29 @@ for epoch in range( epochs ):
 
         #create m samples
         (x_gen, y_gen, noise) = _generate_samples( G, m )
-        #merge with random samples from the true set
         np.random.shuffle( x_train ) #no need to shuffle y_train it is all ones anyway
-        x = np.concatenate( (x_train[ : m ], x_gen) )
-        y = np.concatenate( (y_train[ : m ], y_gen) )
-        # loss = D.train_on_batch( x, y )
-        loss_D_real.append( D.fit( x = x_train[ : m ], y = y_train[ : m ], batch_size = 25, epochs = 1, verbose = 0 ).history[ 'loss' ][ 0 ] )
-        loss_D_fake.append( D.fit( x = x_gen, y = y_gen, batch_size = 25, epochs = 1, verbose = 0 ).history[ 'loss' ][ 0 ] )
 
+
+        loss = D.fit( x = x_train[ : m ], y = y_train[ : m ], batch_size = 25, epochs = 1, verbose = 0 ).history[ 'loss' ][ 0 ]
+        loss_D_real.append( loss )
+        l_real.add( loss )
+
+        loss = D.fit( x = x_gen, y = y_gen, batch_size = 25, epochs = 1, verbose = 0 ).history[ 'loss' ][ 0 ]
+        loss_D_fake.append( loss )
+        l_fake.add( loss )
+
+
+
+        #clip weights becuase MATH
         for l in D.layers:
             weights = l.get_weights()
             weights = [np.clip(w, -0.01, 0.01) for w in weights]
             l.set_weights(weights)
 
-        if i % 20 == 0:
-            print( 'D {}/{} loss real/fake: {}/{}'.format( i + 1, k, sum( loss_D_real ) / len( loss_D_real ), sum( loss_D_fake ) / len( loss_D_fake ) ) )
+        # train D at least 5 epoch and stop improvement is small
+        if i > 5:
+            if l_real.variance() < threshold and l_fake.variance() < threshold:
+                break
 
 
     #train G
@@ -240,6 +290,7 @@ for epoch in range( epochs ):
 
 
 
+    print( 'D loss real/fake: {:.2e}/{:.2e} | trained for: {}'.format( sum( loss_D_real ) / len( loss_D_real ), sum( loss_D_fake ) / len( loss_D_fake ) , i ) )
     print( 'G loss: {} '.format(  l / steps  ) )
     out =  G.predict( validation_noise ) *255
     with warnings.catch_warnings():
