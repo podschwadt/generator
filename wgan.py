@@ -14,6 +14,7 @@ import warnings
 import os
 
 from tools import CircleList
+import time
 
 
 
@@ -42,11 +43,11 @@ batch_size = 25
 
 # optimizers
 lr = 0.00005
-optimizer_d = ( Adam( lr=lr ), loss  )
-optimizer_stacked = ( Adam( lr=lr ), loss )
+optimizer_d = ( RMSprop( lr=lr ), loss  )
+optimizer_stacked = ( RMSprop( lr=lr ), loss )
 
 #threshold after we stop learning
-threshold = 0.2
+threshold = 0.001
 
 
 #global helpers
@@ -74,14 +75,14 @@ def print_summary():
     batch_size = {}
 
     # optimizers
-    optimizer_d = ( Adam( lr={:.2e} ), loss  )
-    optimizer_stacked = ( Adam( lr={:.2e} ), loss )
+    optimizer_d = ({}( lr={:.2e} ), loss  )
+    optimizer_stacked = ( {}( lr={:.2e} ), loss )
 
     #threshold after we stop learning
     threshold = {}
 
     """
-    print( msg.format( RUN, m, k, epochs, batch_size, lr, lr, threshold ) )
+    print( msg.format( RUN, m, k, epochs, batch_size, optimizer_d.__class__.__name__, lr, optimizer_stacked.__class__.__name__, lr, threshold ) )
 
 #################################################################################
 # Discrimnator
@@ -231,6 +232,7 @@ if not no_out:
 #training epochs
 for epoch in range( epochs ):
     print( 'Epoch: {} '.format( epoch ) )
+    start_t = time.time()
     #train D
 
     loss_D_real = []
@@ -245,6 +247,7 @@ for epoch in range( epochs ):
     num_k = 0
 
     for i in range( k ):
+
         # unfreeze D
         D.trainable = True
         for l in D.layers:
@@ -272,7 +275,8 @@ for epoch in range( epochs ):
             l.set_weights(weights)
 
         # train D at least 5 epoch and stop improvement is small
-        if i > 5:
+        # make sure we train the full lenght for the first 5 outer loops
+        if i > 5 and epoch > 5:
             if l_real.variance() < threshold and l_fake.variance() < threshold:
                 break
 
@@ -292,6 +296,7 @@ for epoch in range( epochs ):
 
     print( 'D loss real/fake: {:.2e}/{:.2e} | trained for: {}'.format( sum( loss_D_real ) / len( loss_D_real ), sum( loss_D_fake ) / len( loss_D_fake ) , i ) )
     print( 'G loss: {} '.format(  l / steps  ) )
+    print( 'Time: {} s'.format( time.time() - start_t ) )
     out =  G.predict( validation_noise ) *255
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
