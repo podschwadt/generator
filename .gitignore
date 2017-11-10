@@ -103,4 +103,6 @@ ENV/
 out/
 
 #saved modesl outputs
-saved_models? 
+saved_models/*
+
+report/*.png
