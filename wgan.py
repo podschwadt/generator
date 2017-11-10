@@ -35,7 +35,7 @@ m = 200
 k = 500
 
 #epochs
-epochs = 10000
+epochs = 5000
 
 #batch_size
 batch_size = 25
@@ -46,11 +46,11 @@ optimizer_d = ( Adam( lr=lr ), loss  )
 optimizer_stacked = ( Adam( lr=lr ), loss )
 
 #threshold after we stop learning
-threshold = 0.2
+threshold = 0.02
 
 
 #global helpers
-no_out = True
+no_out = False
 
 def print_summary():
     msg = """
