@@ -1,0 +1,53 @@
+#################################################################################
+# 2
+#################################################################################
+
+def loss( y_true, y_pred ):
+    return K.mean( y_true * y_pred )
+
+#number of samples per iteration
+m = 200
+
+#epochs updating D
+k = 500
+
+#epochs
+epochs = 5000
+
+#batch_size
+batch_size = 25
+
+# optimizers
+optimizer_d = ( Adam( lr=5.00e-05 ), loss  )
+optimizer_stacked = ( Adam( lr=5.00e-05 ), loss )
+
+#threshold after we stop learning
+threshold = 0.02
+
+
+
+RUN = 1
+  #################################################################################
+  # Globals
+  #################################################################################
+
+  def loss( y_true, y_pred ):
+      return K.mean( y_true * y_pred )
+
+  RUN = 11
+
+  #number of samples per iteration
+  m = 200
+
+  #epochs updating D
+  k = 1000
+
+  #epochs
+  epochs = 10000
+
+  #batch_size
+  batch_size = 25
+
+  # optimizers
+  optimizer_d = ( Adam( lr=0.00005 ), loss  )
+  optimizer_stacked = ( Adam( lr=0.00005 ), loss )
