@@ -2,6 +2,9 @@ import keras
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation, Flatten, Reshape
 from keras.layers import Conv2D, MaxPooling2D, Conv2DTranspose, Cropping2D
+from keras.layers import BatchNormalization, Activation, ZeroPadding2D
+from keras.layers.advanced_activations import LeakyReLU
+from keras.layers.convolutional import UpSampling2D
 from keras.optimizers import Adam, RMSprop
 from keras import backend as K
 import keras.datasets
@@ -14,7 +17,7 @@ from skimage import io
 import warnings
 import os
 
-from tools import CircleList
+from tools import CircleList, image_grid
 import time
 
 
@@ -34,10 +37,10 @@ RUN = 2
 m = 200
 
 #epochs updating D
-k = 500
+k = 100
 
 #epochs
-epochs = 5000
+epochs = 500
 
 #batch_size
 batch_size = 25
@@ -50,6 +53,8 @@ optimizer_stacked = ( RMSprop( lr=lr ), loss )
 #threshold after we stop learning
 threshold = 0.001
 
+#generator stuff
+gen_inputs = 100
 
 #global helpers
 no_out = True
@@ -122,7 +127,7 @@ def build_discriminator( input_shape ):
 
 
 #################################################################################
-# Generatordirector
+# Generator
 #################################################################################
 
 gen_inputs = 100
@@ -131,43 +136,57 @@ gen_inputs = 100
 
 def build_generator():
     model = Sequential()
-    model.add( Dense( gen_inputs , input_shape = (gen_inputs, ) ) )
-    model.add( Activation( 'relu' ) )
-    model.add( Dense( 300 ) )
-
-
-    model.add( Activation( 'relu' ) )
-    model.add( Dense( 256 ) )
-    model.add( Activation( 'relu' ) )
-    model.add( Dense( 49 ) )
-    model.add( Dropout( 0.4 ) )
-
-    model.add( Reshape( ( 7, 7,1 ) ) )
-    model.add( Conv2DTranspose( 64
-                                ,(3, 3)
-                                ,strides= ( 2, 2 )
-                                ,padding = 'same'
-                                ) )
-    model.add( Activation( 'relu' ) )
-    model.add( Conv2DTranspose( 64
-                                ,(4, 3)
-                                , padding = 'same'
-                                ) )
-    model.add( Activation( 'relu' ) )
-
-    model.add( Conv2DTranspose( 64
-                                ,(2, 2)
-                                ,strides= ( 2, 2 )
-                                , padding = 'valid'
-                                ) )
-    model.add( Activation( 'relu' ) )
-
-    model.add( Conv2DTranspose( 1
-                                ,(2, 2)
-                                ,strides=(1, 1)
-                                ,padding = 'same'
-                                ) )
-    model.add( Activation( 'relu' ) )
+    model.add(Dense(128 * 7 * 7, activation='relu', input_shape=(gen_inputs,) ) )
+    model.add(Reshape((7, 7, 128)))
+    model.add(BatchNormalization(momentum=0.8))
+    model.add(UpSampling2D())
+    model.add(Conv2D(128, kernel_size=4, padding="same"))
+    model.add(Activation("relu"))
+    model.add(BatchNormalization(momentum=0.8))
+    model.add(UpSampling2D())
+    model.add(Conv2D(64, kernel_size=4, padding="same"))
+    model.add(Activation("relu"))
+    model.add(BatchNormalization(momentum=0.8))
+    model.add(Conv2D(1, kernel_size=4, padding="same"))
+    model.add(Activation("tanh"))
+    # model = Sequential()
+    # model.add( Dense( gen_inputs , input_shape = (gen_inputs, ) ) )
+    # model.add( Activation( 'relu' ) )
+    # model.add( Dense( 300 ) )
+    #
+    #
+    # model.add( Activation( 'relu' ) )
+    # model.add( Dense( 256 ) )
+    # model.add( Activation( 'relu' ) )
+    # model.add( Dense( 49 ) )
+    # model.add( Dropout( 0.4 ) )
+    #
+    # model.add( Reshape( ( 7, 7,1 ) ) )
+    # model.add( Conv2DTranspose( 64
+    #                             ,(3, 3)
+    #                             ,strides= ( 2, 2 )
+    #                             ,padding = 'same'
+    #                             ) )
+    # model.add( Activation( 'relu' ) )
+    # model.add( Conv2DTranspose( 64
+    #                             ,(4, 3)
+    #                             , padding = 'same'
+    #                             ) )
+    # model.add( Activation( 'relu' ) )
+    #
+    # model.add( Conv2DTranspose( 64
+    #                             ,(2, 2)
+    #                             ,strides= ( 2, 2 )
+    #                             , padding = 'valid'
+    #                             ) )
+    # model.add( Activation( 'relu' ) )
+    #
+    # model.add( Conv2DTranspose( 1
+    #                             ,(2, 2)
+    #                             ,strides=(1, 1)
+    #                             ,padding = 'same'
+    #                             ) )
+    # model.add( Activation( 'relu' ) )
 
     return model
 
@@ -177,7 +196,7 @@ def build_generator():
 #################################################################################
 
 def _generate_samples( model, num_samples ):
-    noise = np.random.random_sample( ( num_samples, 100 ) )
+    noise = np.random.random_sample( ( num_samples, gen_inputs ) )
     x_gen = model.predict( noise )
     y_gen = np.arange( x_gen.shape[ 0 ] )
     y_gen = np.ones_like( y_gen )
@@ -209,11 +228,11 @@ x_train =  x_train.astype('float32') / 255.
 x_test =  x_test.astype('float32')  / 255.
 y_train = np.ones_like(  np.arange( x_train.shape[ 0 ] ) ).astype( 'float32' ) * -1.
 
-x_train = x_train.reshape(x_train.shape[0],  28, 28,1)
+x_train = x_train.reshape(x_train.shape[0],  28, 28 ,1)
 
 
 
-validation_noise = np.random.random_sample( ( 1, 100 ) )
+validation_noise = np.random.random_sample( ( 25, gen_inputs ) )
 
 D = build_discriminator( x_train.shape[ 1 : ] )
 G = build_generator()
@@ -283,9 +302,9 @@ for epoch in range( epochs ):
 
         # train D at least 5 epoch and stop improvement is small
         # make sure we train the full lenght for the first 5 outer loops
-        if i > 5 and epoch > 5:
-            if l_real.variance() < threshold and l_fake.variance() < threshold:
-                break
+        # if i > 5 and epoch > 5:
+        #    if l_real.variance() < threshold and l_fake.variance() < threshold:
+        #        break
 
 
     #train G
@@ -304,13 +323,14 @@ for epoch in range( epochs ):
     print( 'D loss real/fake: {:.2e}/{:.2e} | trained for: {}'.format( sum( loss_D_real ) / len( loss_D_real ), sum( loss_D_fake ) / len( loss_D_fake ) , i ) )
     print( 'G loss: {} '.format(  l / steps  ) )
     print( 'Time: {} s'.format( time.time() - start_t ) )
-    out =  G.predict( validation_noise ) *255
-    out = out.reshape( 28, 28,1)
+    out =  G.predict( validation_noise ) * 255
+    print( out.shape )
+    out = image_grid( out, debug=True )
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        io.imsave( 'out/{}.png'.format( epoch ), out[0].astype('uint8'), plugin='pil' )
+        io.imsave( 'out/{}.png'.format( epoch ), out, plugin='pil' )
         if not no_out:
-            io.imsave( 'report/run{}/{}.png'.format( RUN, epoch ), out[0].astype('uint8'), plugin='pil' )
+            io.imsave( 'report/run{}/{}.png'.format( RUN, epoch ), out, plugin='pil' )
 
 D.save( 'saved_models/wgan_D_{}.h5'.format( RUN ) )
 G.save( 'saved_models/wgan_G_{}.h5'.format( RUN ) )
