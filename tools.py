@@ -45,7 +45,6 @@ def image_grid( images, bg_color=( 0, 0, 0 ), distance=( 0, 0 ), debug=False ):
         y_max = max( y_max, i.shape[ 1 ] )
     rows = np.ceil( np.sqrt( len( images ) ) ).astype( int )
     new_size = ( rows * x_max + rows * distance[ 0 ] , rows * y_max + rows * distance[ 1 ] )
-    print( rows )
     new_im = Image.new( 'RGB', new_size, color = bg_color )
     row = 0
     col = 0
@@ -64,7 +63,6 @@ def image_grid( images, bg_color=( 0, 0, 0 ), distance=( 0, 0 ), debug=False ):
             sys.stdout.write('\rProcessing image %i/%i' % ( count, len( images ) ) )
             sys.stdout.flush()
             count += 1
-            print( ( row * x_max + row * distance[ 0 ], col * y_max + col * distance[ 1 ]  ) )
         row += 1
 
     return new_im
