@@ -7,6 +7,8 @@ from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.convolutional import UpSampling2D
 from keras.optimizers import Adam, RMSprop
 from keras import backend as K
+from keras.layers.merge import _Merge
+from keras.engine.topology import Layer
 import keras.datasets
 import numpy as np
 import dataset
@@ -22,14 +24,20 @@ import time
 
 
 
+# based on
+# http://shaofanlai.com/post/10
+# https://github.com/PiscesDream/Keras-GAN
 
 
 #################################################################################
 # Globals
 #################################################################################
 
-def loss( y_true, y_pred ):
+def multiply_mean( y_true, y_pred ):
     return K.mean( y_true * y_pred )
+
+def mean( y_true, y_pred ):
+    return K.mean( y_pred )
 
 RUN = 2
 
@@ -47,11 +55,17 @@ batch_size = 25
 
 # optimizers
 lr = 0.00005
-optimizer_d = ( RMSprop( lr=lr ), loss  )
-optimizer_stacked = ( RMSprop( lr=lr ), loss )
+optimizer_d = ( Adam( lr=lr ), 'binary_crossentropy'  )
+optimizer_stacked = ( Adam( lr=lr ), 'binary_crossentropy' )
 
 #threshold after we stop learning
 threshold = 0.001
+
+#clipvalue
+clipvalue = 0.01
+
+true_label = -1.
+fake_label = 1.
 
 #generator stuff
 gen_inputs = 100
@@ -89,6 +103,36 @@ def print_summary():
 
     """
     print( msg.format( RUN, m, k, epochs, batch_size, optimizer_d.__class__.__name__, lr, optimizer_stacked.__class__.__name__, lr, threshold ) )
+
+#################################################################################
+# Helper classes
+#################################################################################
+class Subtract(_Merge):
+    def _merge_function(self, inputs):
+        output = inputs[0]
+        for i in range(1, len(inputs)):
+            output = output-inputs[i]
+        return output
+
+
+class GradNorm(Layer):
+    def __init__( self, **kwargs ):
+        super( GradNorm, self ).__init__( **kwargs )
+
+    def build( self, input_shapes ):
+        super( GradNorm, self ).build( input_shapes )
+
+    def call( self, inputs ):
+        target, wrt = inputs
+        grads = K.gradients( target, wrt )
+        assert len( grads ) == 1
+        grad = grads[ 0 ]
+        return K.sqrt( K.sum( K.batch_flatten( K.square( grad ) ), axis=1, keepdims=True ) )
+
+    def compute_output_shape( self, input_shapes ):
+        return ( input_shapes[ 1 ][ 0 ], 1 )
+
+
 
 #################################################################################
 # Discrimnator
@@ -132,7 +176,7 @@ def build_discriminator( input_shape ):
 
 gen_inputs = 100
 
-# 53, 33, 3 sample shape
+# 28, 28, 1 sample shape
 
 def build_generator():
     model = Sequential()
@@ -196,12 +240,12 @@ def build_generator():
 #################################################################################
 
 def _generate_samples( model, num_samples ):
-    noise = np.random.random_sample( ( num_samples, gen_inputs ) )
+    noise = np.random.uniform( -1., 1., size = ( num_samples, gen_inputs) ).astype( 'float32' )
     x_gen = model.predict( noise )
     y_gen = np.arange( x_gen.shape[ 0 ] )
-    y_gen = np.ones_like( y_gen )
+    y_gen = np.ones_like( y_gen ) * fake_label
 
-    x_gen = x_gen.reshape(x_gen.shape[0], 28, 28,1)
+    x_gen = x_gen.reshape( x_gen.shape[ 0 ], 28, 28, 1 )
 
 
     return x_gen, y_gen, noise
@@ -226,13 +270,14 @@ def stack_models( G, D ):
 (x_train, y_train), (x_test, y_test) = keras.datasets.mnist.load_data()
 x_train =  x_train.astype('float32') / 255.
 x_test =  x_test.astype('float32')  / 255.
-y_train = np.ones_like(  np.arange( x_train.shape[ 0 ] ) ).astype( 'float32' ) * -1.
+y_train = np.ones_like(  np.arange( x_train.shape[ 0 ] ) ).astype( 'float32' ) * true_label
 
 x_train = x_train.reshape(x_train.shape[0],  28, 28 ,1)
 
 
 
-validation_noise = np.random.random_sample( ( 25, gen_inputs ) )
+validation_noise = np.random.uniform( -1., 1., size = ( 25, gen_inputs) ).astype( 'float32' )
+
 
 D = build_discriminator( x_train.shape[ 1 : ] )
 G = build_generator()
@@ -297,8 +342,8 @@ for epoch in range( epochs ):
         #clip weights becuase MATH
         for l in D.layers:
             weights = l.get_weights()
-            weights = [np.clip(w, -0.01, 0.01) for w in weights]
-            l.set_weights(weights)
+            weights =  [ np.clip( w, -clipvalue, clipvalue ) for w in weights ]
+            l.set_weights( weights )
 
         # train D at least 5 epoch and stop improvement is small
         # make sure we train the full lenght for the first 5 outer loops
@@ -325,7 +370,7 @@ for epoch in range( epochs ):
     print( 'Time: {} s'.format( time.time() - start_t ) )
     out =  G.predict( validation_noise ) * 255
     print( out.shape )
-    out = image_grid( out, debug=True )
+    out = image_grid( out )
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         io.imsave( 'out/{}.png'.format( epoch ), out, plugin='pil' )
