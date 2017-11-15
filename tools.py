@@ -31,8 +31,6 @@ def image_grid( images, bg_color=( 0, 0, 0 ), distance=( 0, 0 ), debug=False ):
     """
     images must be numpy array of images in int [0;255]
     """
-
-    #TODO automatically dertermine mode and reshaping
     images = images.astype( 'uint8' )
     if images.shape[ 3 ] == 1:
         mode = 'L'
@@ -56,7 +54,7 @@ def image_grid( images, bg_color=( 0, 0, 0 ), distance=( 0, 0 ), debug=False ):
         if row == rows:
             col += 1
             row = 0
-        #TODO automatically dertermine mode and reshaping
+
         if i.shape[ 2 ] == 1:
             i = i.reshape( i.shape[ : 2 ] )
         old_im = Image.fromarray( i, mode=mode )
