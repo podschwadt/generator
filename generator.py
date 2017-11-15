@@ -48,7 +48,7 @@ g_acc_history = 10
 def discriminator_loss( y_true, y_pred ):
     one = y_true * K.log( K.clip( y_pred, K.epsilon(), None ) )
     two = ( 1. - y_true ) * K.log( 1. - K.clip ( y_pred, K.epsilon(), None )  )
-    return K.mean( one  + two , axis = -1 )
+    return K.mean( one + two , axis = -1 )
 
 def build_discriminator( input_shape ):
     model = Sequential()
