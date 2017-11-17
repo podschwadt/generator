@@ -3,7 +3,7 @@ import cPickle as pickle
 
 filename = 'dataset.data'
 
-def load( ):
+def load( filename=filename ):
     x = pickle.load( open( filename, 'rb' ) )
     np.random.shuffle( x )
     y = np.arange( x.shape[ 0 ] )
@@ -16,6 +16,7 @@ def load( ):
     y_train = y[ ( x.shape[ 0 ] / 10 ) + 1 :  ]
 
     return ( x_train , y_train ), ( x_test , y_test )
+
 
 if __name__ == '__main__':
     load()
