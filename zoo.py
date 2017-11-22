@@ -69,6 +69,57 @@ def cifar10_0():
 
     return D, G, data
 
+
+def cifar10_1():
+
+    (data, _ ), ( _ , _ ) = cifar10.load_data()
+    #discriminator
+
+    data = normalize( data, 255 )
+
+    nch = 512
+    D = Sequential()
+    h = 5
+
+    D.add( Conv2D( nch, h, strides=2, padding='same', input_shape=data.shape[ 1 : ] ) )
+    D.add( LeakyReLU( 0.2 ) )
+    D.add( Conv2D( int( nch / 2 ), h, strides=2, padding='same'))
+    D.add( LeakyReLU( 0.2 ) )
+    D.add( Conv2D( nch, h, strides=2, padding='same' ) )
+    D.add( LeakyReLU( 0.2 ) )
+    D.add( Conv2D( int( nch / 2 ) , h, strides=2, padding='same' ) )
+    D.add( LeakyReLU( 0.2 ) )
+    D.add( Conv2D( 1, h, strides=2, padding='same' ) )
+    D.add( LeakyReLU( 0.2 ) )
+    D.add( Flatten() )
+    D.add( Activation( 'sigmoid' ) )
+    D.summary()
+
+    #generator
+
+    G = Sequential()
+    nch = 512
+    h = 5
+    G.add( Dense( nch * 4 * 4, input_dim=100 ) )
+    G.add( Reshape( ( ( 4, 4, nch ) )) )
+    G.add( Conv2D( int(nch / 2), (5,5), padding='same') )
+    G.add( LeakyReLU( 0.2 ) )
+    G.add( UpSampling2D( size=( 2, 2 ) ) )
+    G.add( Conv2D( int( nch / 2 ), h, padding='same') )
+    G.add( LeakyReLU( 0.2 ) )
+    G.add( UpSampling2D( size=( 2, 2 ) ) )
+    G.add( Conv2D( int( nch / 4), h, padding='same') )
+    G.add( LeakyReLU( 0.2 ) )
+    G.add( UpSampling2D( size=(2, 2) ) )
+    G.add( Conv2D( 3, h, padding='same') )
+    G.add( Activation( 'sigmoid' ) )
+
+    G.summary()
+    print(G.get_input_shape_at( 0 ))
+
+    return D, G, data
+
+
 def mnist_0():
 
     (data, _ ), ( _ , _ ) = mnist.load_data()

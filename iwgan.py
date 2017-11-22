@@ -10,13 +10,25 @@ import keras.backend as K
 import warnings
 from skimage import io
 import sys
+import scipy.spatial.distance as sp_dist
 
+
+np.set_printoptions( threshold=np.nan, linewidth=np.nan, precision=2  )
 
 def multiply_mean( y_true, y_pred ):
     return K.mean( y_true * y_pred )
 
 def mean( y_true, y_pred ):
     return K.mean( y_pred )
+
+def distance( x ):
+    if len( x.shape ) == 4:
+        x = np.mean( x, 3 )
+    result = np.zeros( ( x.shape[ 0 ], x.shape[ 0 ] ) )
+    for i in range( x.shape[ 0 ] ):
+        for j in range( x.shape[ 0 ] ):
+            result[ i ][ j ] = np.mean( ( x[ i ] - x[ j ] ) ** 2 )
+    return result
 
 
 class IWGAN( object ):
@@ -49,10 +61,14 @@ class IWGAN( object ):
         minus_ones = ones * -1.
         timer = Timer( iterations )
         output_pattern = out_dir + '/{:0' + str( len( str( iterations ) ) ) + 'd}.png' #erghh if it is stupid but it works it is not stupid
+        clear = '\r                                                                                                                                                '
         progress = '{} | D( loss:\t{:0.2f}, diff:\t{:0.2f}, norm:\t{:0.2f}, ; G( loss:\t{:0.2f}  )'
 
         #get some noise:
         out_samples = self.make_some_noise()
+        distance_samples = self.make_some_noise( 10 )
+
+        print( distance( distance_samples ) )
 
         for i in range( iterations ):
             timer.start_step()
@@ -75,8 +91,8 @@ class IWGAN( object ):
                 replace = False
                 for j, w in enumerate( weights ):
                     if np.isnan( w ).any():
-                        print('\nfucking NaN man')
-                        weights[ l ] = np.nan_to_num( w )
+                        # print('\nfucking NaN man')
+                        weights[ j ] = np.nan_to_num( w )
                         replace = True
                 if replace:
                     l.set_weights( weights )
@@ -84,8 +100,7 @@ class IWGAN( object ):
             if i % out_iter == 0:
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
-                    # print(  self.generate( out_samples )  )
-                    # print(  np.clip( ( self.generate( out_samples ) + 1 ) * 127.5, 0, 255 ) )
+                    # print( distance( np.clip( ( self.generate( distance_samples ) + 1 ) * 127.5, 0, 255 ) ) )
                     io.imsave( output_pattern.format( i ),
                         image_grid( np.clip( ( self.generate( out_samples ) + 1 ) * 127.5, 0, 255 ) ), # make sure we have valid values
                         plugin='pil' )
@@ -95,6 +110,8 @@ class IWGAN( object ):
 
             timer.stop_step()
             #progess reporting
+            sys.stdout.write( clear )
+            sys.stdout.flush()
             sys.stdout.write( '\r' + progress.format( timer.out_str(), d_loss, d_diff, d_norm, g_loss ) )
             sys.stdout.flush()
 
@@ -111,7 +128,7 @@ class IWGAN( object ):
             l.trainable = trainable
 
 if __name__ == '__main__':
-    (D, G, data) = zoo.cifar10_0()
+    (D, G, data) = zoo.cifar10_1()
     gan = IWGAN( D, G )
-    gan.fit(data, iterations=10000,
+    gan.fit(data, iterations=5000,
                 out_iter=50 )
