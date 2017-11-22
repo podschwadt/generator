@@ -47,9 +47,12 @@ class Timer( object ):
     def __str__( self ):
         return time.strftime( '%H:%M:%S', time.gmtime( ( self.steps - self.count ) * self.list.mean() ) )
 
+    def out_str( self ):
+        return 'remaining {} | {}/{} '.format( self, self.count, self.steps  )
+
     def out( self ):
         if self.count % self.print_steps == 0:
-            sys.stdout.write('\rremaining {} | {}/{} '.format( self, self.count, self.steps  ) )
+            sys.stdout.write( '\r' + self.out_str() )
             sys.stdout.flush()
 
 
