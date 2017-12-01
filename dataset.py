@@ -3,7 +3,10 @@ import cPickle as pickle
 
 filename = 'dataset.data'
 
-def load( filename=filename, channels_first=False ):
+def load( filename=filename, channels_first=False, seed=None ):
+
+    np.random.seed( seed )
+
     x = pickle.load( open( filename, 'rb' ) )
     np.random.shuffle( x )
     y = np.arange( x.shape[ 0 ] )
