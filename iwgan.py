@@ -13,7 +13,7 @@ import sys
 import scipy.spatial.distance as sp_dist
 
 
-np.set_printoptions( threshold=np.nan, linewidth=np.nan, precision=2  )
+# np.set_printoptions( threshold=np.nan, linewidth=np.nan, precision=2  )
 
 def multiply_mean( y_true, y_pred ):
     return K.mean( y_true * y_pred )
@@ -33,7 +33,14 @@ def distance( x ):
 
 class IWGAN( object ):
 
-    def __init__( self, discriminator, generator, opt=Adam(lr=0.0001, beta_1=0.5, beta_2=0.9), lmbd=10 ):
+    def __init__( self, discriminator, generator,
+                opt=Adam(
+                    lr=0.0001,
+                    beta_1=0.5,
+                    beta_2=0.9,
+                    # decay=1e-7
+                    )
+                ,lmbd=10 ):
         self.generator = generator
         self.discriminator = discriminator
 
@@ -52,12 +59,12 @@ class IWGAN( object ):
 
     def fit( self, data,
             iterations=1000,
-            batch_size=50,
+            batch_size=64,
             k=2,
             out_dir='./out',
             out_iter=5 ):
         #some helpful things
-        ones = np.ones( ( batch_size, 1 ) )
+        ones = np.ones( ( batch_size, 1 ) ).astype( 'float32' )
         minus_ones = ones * -1.
         timer = Timer( iterations )
         output_pattern = out_dir + '/{:0' + str( len( str( iterations ) ) ) + 'd}.png' #erghh if it is stupid but it works it is not stupid
@@ -70,6 +77,13 @@ class IWGAN( object ):
 
         print( distance( distance_samples ) )
 
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            # print( distance( np.clip( ( self.generate( distance_samples ) + 1 ) * 127.5, 0, 255 ) ) )
+            io.imsave( out_dir + '/real_samples.png',
+                image_grid( np.clip( ( data[ : 64 ] + 1 ) * 127.5, 0, 255 ) ), # make sure we have valid values
+                plugin='pil' )
+
         for i in range( iterations ):
             timer.start_step()
             #train discriminator
@@ -81,21 +95,42 @@ class IWGAN( object ):
                 interpolation = ( real_data.T * epsilon ).T + ( fake_data.T * ( 1 - epsilon ) ).T
                 d_loss, d_diff, d_norm = self.dis_trainer.train_on_batch( [ real_data, fake_data, interpolation ], [ ones ] * 2 )
 
+                ##something messed up
+                # for l in self.dis_trainer.layers:
+                #     weights = l.get_weights()
+                #     replace = False
+                #     for j, w in enumerate( weights ):
+                #         if np.isnan( w ).any():
+                #             weights[ j ] = np.nan_to_num( w )
+                #             replace = True
+                #     if replace:
+                #         l.set_weights( weights )
+                # if replace:
+                #     print('\nfucking NaN man')
+
             #trian generator
             self.make_trainable( False )
             g_loss = self.gan.train_on_batch( self.make_some_noise( batch_size ), minus_ones )
 
-            #something messed up
-            for l in self.gan.layers:
-                weights = l.get_weights()
-                replace = False
-                for j, w in enumerate( weights ):
-                    if np.isnan( w ).any():
-                        # print('\nfucking NaN man')
-                        weights[ j ] = np.nan_to_num( w )
-                        replace = True
-                if replace:
-                    l.set_weights( weights )
+            ##something messed up
+            # for l in self.gan.layers:
+            #     weights = l.get_weights()
+            #     replace = False
+            #     for j, w in enumerate( weights ):
+            #         if np.isnan( w ).any():
+            #             weights[ j ] = np.nan_to_num( w )
+            #             replace = True
+            #     if replace:
+            #         l.set_weights( weights )
+            # if replace:
+            #     print('\nfucking NaN man')
+
+            if np.isnan( d_loss ):
+                for j,l in enumerate( self.gan.layers):
+                    for k, w in enumerate(  l.get_weights() ):
+                        w = np.nan_to_num( w )
+                        print( '{}/{}: {}/{}'.format( j, k, np.min( w ), np.max( w ) )  )
+
 
             if i % out_iter == 0:
                 with warnings.catch_warnings():
@@ -128,7 +163,7 @@ class IWGAN( object ):
             l.trainable = trainable
 
 if __name__ == '__main__':
-    (D, G, data) = zoo.cifar10_1()
+    (D, G, data) = zoo.cifar10_iwgan_paper( filters=64 )
     gan = IWGAN( D, G )
     gan.fit(data, iterations=5000,
-                out_iter=50 )
+                out_iter=100 )
