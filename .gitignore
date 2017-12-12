@@ -109,3 +109,5 @@ report/*.png
 
 report/run*
 report/*/*.png
+
+refine/*

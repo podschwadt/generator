@@ -1,31 +1,3 @@
-
-Skip to content
-This repository
-
-    Pull requests
-    Issues
-    Marketplace
-    Explore
-
-    @podschwadt
-
-0
-0
-
-    0
-
-podschwadt/generator Private
-Code
-Issues 0
-Pull requests 0
-Projects 0
-Wiki
-Insights
-Settings
-generator/wgan_mnist.py
-35c3499 a day ago
-@podschwadt podschwadt trying a didderent model
-356 lines (266 sloc) 9.8 KB
 import keras
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation, Flatten, Reshape
@@ -374,16 +346,3 @@ G.save( 'saved_models/wgan_G_{}.h5'.format( RUN ) )
 #         plt.imshow( i )
 #         plt.show()
 
-    © 2017 GitHub, Inc.
-    Terms
-    Privacy
-    Security
-    Status
-    Help
-
-    Contact GitHub
-    API
-    Training
-    Shop
-    Blog
-    About
